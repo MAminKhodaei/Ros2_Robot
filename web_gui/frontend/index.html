@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>رابط کاربری کنترل ربات</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="main-container">
+        <div class="media-column">
+            <div id="video-container" class="panel">
+                <div class="panel-header">دوربین زنده</div>
+                <img id="video-stream" src="placeholder.jpg" alt="جایگاه تصویر دوربین">
+            </div>
+            <div id="map-container" class="panel">
+                <div class="panel-header">موقعیت GPS</div>
+                <div id="map"></div>
+            </div>
+        </div>
+
+        <div class="control-column">
+            <div id="controls-container" class="panel">
+                <div class="panel-header">کنترل حرکت</div>
+                <div class="d-pad">
+                    <button id="btn-forward">▲</button>
+                    <button id="btn-left">◀</button>
+                    <button id="btn-stop">■</button>
+                    <button id="btn-right">▶</button>
+                    <button id="btn-backward">▼</button>
+                </div>
+            </div>
+            <div id="status-container" class="panel">
+                <div class="panel-header">وضعیت سیستم</div>
+                <p>وضعیت اتصال: <span id="connection-status">قطع</span></p>
+                <p>GPS: <span id="gps-status">در حال جستجو...</span></p>
+            </div>
+        </div>
+    </div>
+    
+    <script src="main.js"></script>
+</body>
+</html>
