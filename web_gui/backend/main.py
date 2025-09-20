@@ -1,15 +1,12 @@
 # =================================================================
 # ==        main.py - نسخه نهایی و صحیح برای ROS 2               ==
 # =================================================================
-import socketio
+import socketio, rclpy, threading, asyncio
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import NavSatFix
-import threading
-import asyncio
 
 class RosBridgeNode(Node):
     def __init__(self, sio_server):
@@ -31,11 +28,14 @@ class RosBridgeNode(Node):
     def gps_callback(self, msg):
         asyncio.run(self.sio.emit('gps_update', {'lat': msg.latitude, 'lon': msg.longitude}))
 
+# --- راه‌اندازی سرور ---
 app = FastAPI()
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
 socket_app = socketio.ASGIApp(sio)
 app.mount("/socket.io", socket_app)
-app.mount("/", StaticFiles(directory="../frontend", html=True), name="static")
+
+# مسیر صحیح به پوشه frontend
+app.mount("/", StaticFiles(directory="frontend", html=True), name="static")
 
 rclpy.init()
 ros_node = RosBridgeNode(sio_server=sio)
