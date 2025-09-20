@@ -6,7 +6,7 @@ from launch.actions import ExecuteProcess
 def generate_launch_description():
     # مسیر پروژه شما روی رزبری پای
     # این مسیر را با مسیر واقعی پروژه خود جایگزین کنید
-    project_base_path = '/home/mr-amin/robot_project' 
+    project_base_path = '/home/amin/robot_project' 
 
     return LaunchDescription([
         # 1. اجرای Micro-ROS Agent
