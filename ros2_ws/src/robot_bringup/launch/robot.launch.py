@@ -1,9 +1,9 @@
 # =================================================================
-# ==     robot.launch.py - نسخه نهایی (با مسیرهای صحیح)          ==
+# ==     robot.launch.py - نسخه نهایی (با تمام اصلاحات)          ==
 # =================================================================
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess
 from launch_ros.actions import Node
+from launch.actions import ExecuteProcess
 import os
 
 def generate_launch_description():
@@ -24,15 +24,13 @@ def generate_launch_description():
             output='screen'
         ),
         
-        # 2. اجرای گره دوربین (با روش استاندارد Node)
+        # 2. اجرای گره دوربین (با پارامترهای پایدارتر)
         Node(
             package='camera_ros',
             executable='camera_node',
             name='pi_camera',
             parameters=[
-                {'camera_name': 'pi_camera'},
-                {'frame_id': 'camera_link'},
-                {'pixel_format': 'rgb8'},
+                {'pixel_format': 'YUYV'}, 
                 {'image_width': 640},
                 {'image_height': 480},
                 {'framerate': 15.0},
