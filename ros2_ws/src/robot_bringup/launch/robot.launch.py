@@ -4,20 +4,18 @@ from launch_ros.actions import Node
 from launch.actions import ExecuteProcess
 
 def generate_launch_description():
-    # مسیر پروژه شما روی رزبری پای
-    # این مسیر را با مسیر واقعی پروژه خود جایگزین کنید
     project_base_path = '/home/amin/robot_project' 
 
     return LaunchDescription([
-        # 1. اجرای Micro-ROS Agent
+        
+        # 1. اجرای پل ارتباطی سریال ما (جایگزین micro-ros-agent)
         Node(
-            package='micro_ros_agent',
-            executable='micro_ros_agent',
-            name='micro_ros_agent',
-            arguments=['serial', '--dev', '/dev/ttyACM0']
+            package='robot_bringup',
+            executable='serial_bridge_node',
+            name='serial_bridge'
         ),
         
-        # 2. اجرای گره دوربین رسمی (روش پیشنهادی)
+        # 2. اجرای گره دوربین رسمی (بدون تغییر)
         Node(
             package='camera_ros',
             executable='camera_node',
@@ -30,13 +28,12 @@ def generate_launch_description():
                 {'image_height': 480},
                 {'framerate': 15.0},
             ],
-            # این خط تاپیک تصویر را به نامی که در وب سرور استفاده می‌کنیم، تغییر می‌دهد
             remappings=[
                 ('/pi_camera/image_raw', '/video_stream')
             ]
         ),
         
-        # 3. اجرای وب سرور (Backend)
+        # 3. اجرای وب سرور (Backend) (بدون تغییر)
         ExecuteProcess(
             cmd=[f'{project_base_path}/web_gui/venv/bin/python', '-m', 'uvicorn', 'backend.main:app', '--host', '0.0.0.0', '--port', '8000'],
             cwd=f'{project_base_path}/web_gui',

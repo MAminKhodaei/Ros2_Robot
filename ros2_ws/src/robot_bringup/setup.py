@@ -22,8 +22,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            # این خط به ROS 2 می‌گوید که اسکریپت ما کجاست
             'camera_node = robot_bringup.camera_node:main',
+            'serial_bridge_node = robot_bringup.serial_bridge_node:main', 
         ],
     },
 )
