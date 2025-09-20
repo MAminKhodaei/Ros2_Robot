@@ -12,7 +12,7 @@ class SerialBridgeNode(Node):
         super().__init__('serial_bridge_node')
 
         # پارامترها برای پورت سریال
-        self.declare_parameter('serial_port', '/dev/ttyACM0')
+        self.declare_parameter('serial_port', '/dev/ttyUSB0')
         self.declare_parameter('baud_rate', 115200)
 
         port = self.get_parameter('serial_port').value

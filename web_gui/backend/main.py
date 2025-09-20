@@ -1,45 +1,51 @@
-# launch/robot.launch.py
-from launch import LaunchDescription
-from launch_ros.actions import Node
-from launch.actions import ExecuteProcess
+# =================================================================
+# ==        main.py - نسخه نهایی و صحیح برای ROS 2               ==
+# =================================================================
+import socketio
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+import rclpy
+from rclpy.node import Node
+from geometry_msgs.msg import Twist
+from sensor_msgs.msg import NavSatFix
+import threading
+import asyncio
 
-def generate_launch_description():
-    # مسیر پروژه شما روی رزبری پای
-    # این مسیر را با مسیر واقعی پروژه خود جایگزین کنید
-    project_base_path = '/home/amin/robot_project' 
+class RosBridgeNode(Node):
+    def __init__(self, sio_server):
+        super().__init__('web_gui_ros_bridge')
+        self.sio = sio_server
+        self.cmd_vel_publisher_ = self.create_publisher(Twist, 'cmd_vel', 10)
+        self.gps_subscriber_ = self.create_subscription(NavSatFix, 'gps/fix', self.gps_callback, 10)
+        self.get_logger().info('ROS 2 Bridge Node is ready.')
 
-    return LaunchDescription([
-        # 1. اجرای Micro-ROS Agent
-        Node(
-            package='micro_ros_agent',
-            executable='micro_ros_agent',
-            name='micro_ros_agent',
-            arguments=['serial', '--dev', '/dev/ttyACM0']
-        ),
-        
-        # 2. اجرای گره دوربین رسمی (روش پیشنهادی)
-        Node(
-            package='camera_ros',
-            executable='camera_node',
-            name='pi_camera',
-            parameters=[
-                {'camera_name': 'pi_camera'},
-                {'frame_id': 'camera_link'},
-                {'pixel_format': 'rgb8'},
-                {'image_width': 640},
-                {'image_height': 480},
-                {'framerate': 15.0},
-            ],
-            # این خط تاپیک تصویر را به نامی که در وب سرور استفاده می‌کنیم، تغییر می‌دهد
-            remappings=[
-                ('/pi_camera/image_raw', '/video_stream')
-            ]
-        ),
-        
-        # 3. اجرای وب سرور (Backend)
-        ExecuteProcess(
-            cmd=[f'{project_base_path}/web_gui/venv/bin/python', '-m', 'uvicorn', 'backend.main:app', '--host', '0.0.0.0', '--port', '8000'],
-            cwd=f'{project_base_path}/web_gui',
-            output='screen'
-        )
-    ])
+    def publish_command(self, command: str):
+        msg = Twist()
+        if command == 'forward': msg.linear.x = 1.0
+        elif command == 'backward': msg.linear.x = -1.0
+        elif command == 'left': msg.angular.z = 1.0
+        elif command == 'right': msg.angular.z = -1.0
+        elif command == 'stop': msg.linear.x = 0.0; msg.angular.z = 0.0
+        self.cmd_vel_publisher_.publish(msg)
+
+    def gps_callback(self, msg):
+        asyncio.run(self.sio.emit('gps_update', {'lat': msg.latitude, 'lon': msg.longitude}))
+
+app = FastAPI()
+sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
+socket_app = socketio.ASGIApp(sio)
+app.mount("/socket.io", socket_app)
+app.mount("/", StaticFiles(directory="../frontend", html=True), name="static")
+
+rclpy.init()
+ros_node = RosBridgeNode(sio_server=sio)
+ros_thread = threading.Thread(target=rclpy.spin, args=(ros_node,), daemon=True)
+ros_thread.start()
+
+@sio.event
+async def connect(sid, environ): print(f"✅ Client connected: {sid}")
+@sio.event
+async def disconnect(sid): print(f"❌ Client disconnected: {sid}")
+@sio.on('control')
+async def on_control_message(sid, data):
+    ros_node.publish_command(data.get('command'))
