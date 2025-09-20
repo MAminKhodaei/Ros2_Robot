@@ -1,0 +1,9 @@
+# camera_params.yaml
+pi_camera:
+  ros__parameters:
+    camera_name: pi_camera
+    frame_id: camera_link
+    pixel_format: rgb8
+    image_width: 640
+    image_height: 480
+    framerate: 15.0

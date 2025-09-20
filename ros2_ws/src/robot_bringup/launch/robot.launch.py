@@ -1,36 +1,41 @@
-# launch/robot.launch.py
+# =================================================================
+# ==              robot.launch.py - نسخه نهایی و قطعی             ==
+# =================================================================
+# این نسخه گره‌های پایتون را مستقیماً اجرا کرده و colcon را دور می‌زند
+
 from launch import LaunchDescription
-from launch_ros.actions import Node
 from launch.actions import ExecuteProcess
+import os
 
 def generate_launch_description():
-    project_base_path = '/home/amin/robot_project' 
-
+    # مسیر ریشه پروژه شما
+    project_base_path = '/home/amin/robot_project'
+    
+    # مسیر ورک‌اسپیس ROS 2
+    ros2_ws_path = os.path.join(project_base_path, 'ros2_ws')
+    
+    # مسیر دقیق اسکریپت‌های پایتون شما
+    # توجه: این مسیر به پوشه 'src' اشاره دارد، نه 'install'
+    bringup_pkg_path = os.path.join(ros2_ws_path, 'src', 'robot_bringup')
+    serial_bridge_script = os.path.join(bringup_pkg_path, 'serial_bridge_node.py')
+    
     return LaunchDescription([
         
-        # 1. اجرای پل ارتباطی سریال ما (جایگزین micro-ros-agent)
-        Node(
-            package='robot_bringup',
-            executable='serial_bridge_node',
-            name='serial_bridge'
+        # 1. اجرای پل ارتباطی سریال (به صورت مستقیم)
+        ExecuteProcess(
+            cmd=['python3', serial_bridge_script],
+            name='serial_bridge_node',
+            output='screen'
         ),
         
-        # 2. اجرای گره دوربین رسمی (بدون تغییر)
-        Node(
-            package='camera_ros',
-            executable='camera_node',
+        # 2. اجرای گره دوربین رسمی (این چون از قبل نصب شده، با Node اجرا می‌شود)
+        # این بخش بدون تغییر است
+        ExecuteProcess(
+            cmd=['ros2', 'run', 'camera_ros', 'camera_node'],
             name='pi_camera',
-            parameters=[
-                {'camera_name': 'pi_camera'},
-                {'frame_id': 'camera_link'},
-                {'pixel_format': 'rgb8'},
-                {'image_width': 640},
-                {'image_height': 480},
-                {'framerate': 15.0},
-            ],
-            remappings=[
-                ('/pi_camera/image_raw', '/video_stream')
-            ]
+            output='screen',
+            # اضافه کردن پارامترها از طریق خط فرمان
+            additional_env={'ROS_PARAMS_FILE': os.path.join(bringup_pkg_path, 'launch/camera_params.yaml')}
         ),
         
         # 3. اجرای وب سرور (Backend) (بدون تغییر)
