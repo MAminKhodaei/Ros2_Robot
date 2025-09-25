@@ -1,6 +1,3 @@
-# =================================================================
-# ==     robot.launch.py - نسخه نهایی (با تمام اصلاحات)          ==
-# =================================================================
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import ExecuteProcess
@@ -9,22 +6,18 @@ import os
 def generate_launch_description():
     project_base_path = '/home/amin/robot_project'
     
-    # مسیر صحیح به پوشه داخلی پکیج شما
     bringup_pkg_scripts_path = os.path.join(project_base_path, 'ros2_ws', 'src', 'robot_bringup', 'robot_bringup')
     
-    # مسیر صحیح اسکریپت پل ارتباطی سریال
     serial_bridge_script = os.path.join(bringup_pkg_scripts_path, 'serial_bridge_node.py')
     
     return LaunchDescription([
         
-        # 1. اجرای پل ارتباطی سریال (با مسیر صحیح)
         ExecuteProcess(
             cmd=['python3', serial_bridge_script],
             name='serial_bridge_node',
             output='screen'
         ),
         
-        # 2. اجرای گره دوربین (با پارامترهای پایدارتر)
         Node(
             package='camera_ros',
             executable='camera_node',
@@ -40,7 +33,6 @@ def generate_launch_description():
             ]
         ),
         
-        # 3. اجرای وب سرور (Backend)
         ExecuteProcess(
             cmd=[f'{project_base_path}/web_gui/venv/bin/python', '-m', 'uvicorn', 'backend.main:app', '--host', '0.0.0.0', '--port', '8000'],
             cwd=f'{project_base_path}/web_gui',
