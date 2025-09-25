@@ -1,6 +1,4 @@
-# =================================================================
-# ==        main.py - نسخه نهایی و صحیح برای ROS 2               ==
-# =================================================================
+
 import socketio, rclpy, threading, asyncio
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -34,7 +32,6 @@ sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
 socket_app = socketio.ASGIApp(sio)
 app.mount("/socket.io", socket_app)
 
-# مسیر صحیح به پوشه frontend
 app.mount("/", StaticFiles(directory="frontend", html=True), name="static")
 
 rclpy.init()
