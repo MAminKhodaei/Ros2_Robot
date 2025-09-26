@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let robotMarker = L.marker([35.6892, 51.3890]).addTo(map).bindPopup('موقعیت ربات');
     let isFirstGpsUpdate = true;
 
+    // Listen for distance updates from the server
     // --- اتصال WebSocket و مدیریت رویدادها ---
     const socket = io();
 

@@ -8,6 +8,7 @@ from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import NavSatFix, Image # <-- Image را اضافه کنید
 from cv_bridge import CvBridge # <-- cv_bridge را اضافه کنید
+from sensor_msgs.msg import Range # <-- Add this import
 
 class RosBridgeNode(Node):
     def __init__(self, sio_server):
@@ -17,7 +18,7 @@ class RosBridgeNode(Node):
         
         self.cmd_vel_publisher_ = self.create_publisher(Twist, 'cmd_vel', 10)
         self.gps_subscriber_ = self.create_subscription(NavSatFix, 'gps/fix', self.gps_callback, 10)
-        
+        self.distance_subscriber_ = self.create_subscription(Range, 'distance', self.distance_callback, 10)
         # ---订阅 کننده جدید برای دریافت فریم‌های ویدیو---
         self.image_subscriber_ = self.create_subscription(
             Image,
@@ -29,6 +30,11 @@ class RosBridgeNode(Node):
         self.get_logger().info('ROS 2 Bridge Node is ready.')
 
     # ... (تابع publish_command و gps_callback بدون تغییر باقی می‌مانند) ...
+    def distance_callback(self, msg):
+        # We send the distance in centimeters for easier display
+        distance_cm = round(msg.range * 100, 1)
+        asyncio.run(self.sio.emit('distance_update', {'distance': distance_cm}))
+        
     def publish_command(self, command: str):
         msg = Twist()
         if command == 'forward': msg.linear.x = 1.0
@@ -63,7 +69,7 @@ app = FastAPI()
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
 socket_app = socketio.ASGIApp(sio)
 app.mount("/socket.io", socket_app)
-app.mount("/", StaticFiles(directory="../frontend", html=True), name="static")
+app.mount("/", StaticFiles(directory="frontend", html=True), name="static")
 
 rclpy.init()
 ros_node = RosBridgeNode(sio_server=sio)
