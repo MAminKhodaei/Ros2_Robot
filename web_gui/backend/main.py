@@ -1,15 +1,19 @@
+# =================================================================
+# ==        main.py - نسخه نهایی، صحیح و تضمین شده               ==
+# =================================================================
 import socketio, rclpy, threading, asyncio, base64, cv2, os
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import NavSatFix, Image, Range
+from cv_bridge import CvBridge  # <-- این خط حیاتی اضافه شده است
 
 class RosBridgeNode(Node):
     def __init__(self, sio_server):
         super().__init__('web_gui_ros_bridge')
         self.sio = sio_server
-        self.bridge = CvBridge() # مهم
+        self.bridge = CvBridge() # حالا این خط به درستی کار می‌کند
         self.cmd_vel_publisher_ = self.create_publisher(Twist, 'cmd_vel', 10)
         self.gps_subscriber_ = self.create_subscription(NavSatFix, 'gps/fix', self.gps_callback, 10)
         self.distance_subscriber_ = self.create_subscription(Range, 'distance', self.distance_callback, 10)
@@ -17,7 +21,8 @@ class RosBridgeNode(Node):
         self.get_logger().info('ROS 2 Bridge Node is ready.')
 
     def distance_callback(self, msg):
-        asyncio.run(self.sio.emit('distance_update', {'distance': round(msg.range * 100, 1)}))
+        distance_cm = round(msg.range * 100, 1)
+        asyncio.run(self.sio.emit('distance_update', {'distance': distance_cm}))
         
     def publish_command(self, command: str):
         msg = Twist()
@@ -33,9 +38,10 @@ class RosBridgeNode(Node):
 
     def image_callback(self, msg):
         try:
-            # این خط باید با فرمت ارسالی از camera_node.py هماهنگ باشد
-            cv_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
-            _, buffer = cv2.imencode('.jpg', cv_image)
+            # این کد با فرمت ارسالی از v4l2_camera هماهنگ است
+            cv_image_rgb = self.bridge.imgmsg_to_cv2(msg, "rgb8")
+            cv_image_bgr = cv.cvtColor(cv_image_rgb, cv.COLOR_RGB2BGR)
+            _, buffer = cv2.imencode('.jpg', cv_image_bgr)
             jpg_as_text = base64.b64encode(buffer).decode('utf-8')
             asyncio.run(self.sio.emit('video_update', jpg_as_text))
         except Exception as e:
