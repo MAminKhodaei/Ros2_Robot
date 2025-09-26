@@ -1,19 +1,19 @@
-# main.py - نسخه نهایی با دریافت تصویر فشرده (MJPG)
-import socketio, rclpy, threading, asyncio, base64, cv2, os, numpy
+import socketio, rclpy, threading, asyncio, base64, cv2, os
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
-from sensor_msgs.msg import NavSatFix, CompressedImage, Range
+from sensor_msgs.msg import NavSatFix, Image, Range
 
 class RosBridgeNode(Node):
     def __init__(self, sio_server):
         super().__init__('web_gui_ros_bridge')
         self.sio = sio_server
+        self.bridge = CvBridge() # مهم
         self.cmd_vel_publisher_ = self.create_publisher(Twist, 'cmd_vel', 10)
         self.gps_subscriber_ = self.create_subscription(NavSatFix, 'gps/fix', self.gps_callback, 10)
         self.distance_subscriber_ = self.create_subscription(Range, 'distance', self.distance_callback, 10)
-        self.image_subscriber_ = self.create_subscription(CompressedImage, 'video_stream/compressed', self.image_callback, 10)
+        self.image_subscriber_ = self.create_subscription(Image, 'video_stream', self.image_callback, 10)
         self.get_logger().info('ROS 2 Bridge Node is ready.')
 
     def distance_callback(self, msg):
@@ -33,15 +33,15 @@ class RosBridgeNode(Node):
 
     def image_callback(self, msg):
         try:
-            np_arr = numpy.frombuffer(msg.data, numpy.uint8)
-            cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+            # این خط باید با فرمت ارسالی از camera_node.py هماهنگ باشد
+            cv_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
             _, buffer = cv2.imencode('.jpg', cv_image)
             jpg_as_text = base64.b64encode(buffer).decode('utf-8')
             asyncio.run(self.sio.emit('video_update', jpg_as_text))
         except Exception as e:
-            self.get_logger().error(f"Error processing compressed image: {e}")
+            self.get_logger().error(f"Error processing image: {e}")
 
-# --- بقیه کد بدون تغییر ---
+# --- بقیه کد بدون تغییر است ---
 app = FastAPI()
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
 socket_app = socketio.ASGIApp(sio)
