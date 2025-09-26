@@ -1,6 +1,3 @@
-# =================================================================
-# ==        main.py - نسخه نهایی و صحیح با فرمت رنگ RGB8          ==
-# =================================================================
 import socketio, rclpy, threading, asyncio, base64, cv2, os
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -37,22 +34,22 @@ class RosBridgeNode(Node):
     def gps_callback(self, msg):
         asyncio.run(self.sio.emit('gps_update', {'lat': msg.latitude, 'lon': msg.longitude}))
 
-    # --- تابع callback اصلاح شده برای پردازش صحیح تصویر ---
+    # --- تابع callback جدید برای پردازش هر فریم تصویر ---
     def image_callback(self, msg):
         try:
-            # تغییر کلیدی اینجاست: ما به طور مستقیم فرمت rgb8 را می‌خوانیم
-            cv_image = self.bridge.imgmsg_to_cv2(msg, "rgb8")
+            # 1. تصویر را با فرمت خام YUYV از ROS دریافت کن
+            cv_image_yuyv = self.bridge.imgmsg_to_cv2(msg, "yuyv8")
             
-            # چون OpenCV به فرمت BGR نیاز دارد، یک بار رنگ‌ها را جابجا می‌کنیم
-            cv_image_bgr = cv2.cvtColor(cv_image, cv2.COLOR_RGB2BGR)
-
-            # تصویر صحیح را به فرمت JPEG فشرده می‌کنیم
+            # 2. با استفاده از OpenCV، آن را به فرمت استاندارد BGR تبدیل کن
+            cv_image_bgr = cv2.cvtColor(cv_image_yuyv, cv2.COLOR_YUV2BGR_YUYV)
+            
+            # 3. تصویر صحیح را به فرمت JPEG فشرده کن
             _, buffer = cv2.imencode('.jpg', cv_image_bgr)
             
-            # تصویر را برای ارسال آماده می‌کنیم
+            # 4. تصویر را برای ارسال آماده کن
             jpg_as_text = base64.b64encode(buffer).decode('utf-8')
             
-            # تصویر صحیح را به رابط کاربری می‌فرستیم
+            # 5. تصویر صحیح را به رابط کاربری بفرست
             asyncio.run(self.sio.emit('video_update', jpg_as_text))
         except Exception as e:
             self.get_logger().error(f"Error processing image: {e}")
