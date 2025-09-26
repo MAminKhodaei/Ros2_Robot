@@ -37,12 +37,22 @@ class RosBridgeNode(Node):
     def gps_callback(self, msg):
         asyncio.run(self.sio.emit('gps_update', {'lat': msg.latitude, 'lon': msg.longitude}))
 
+    # --- تابع callback جدید برای پردازش هر فریم تصویر ---
     def image_callback(self, msg):
         try:
-            # کد صحیح و پایدار
-            cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
-            _, buffer = cv2.imencode('.jpg', cv_image)
+            # 1. تصویر را با فرمت خام YUYV از ROS دریافت کن
+            cv_image_yuyv = self.bridge.imgmsg_to_cv2(msg, "yuyv8")
+            
+            # 2. با استفاده از OpenCV، آن را به فرمت استاندارد BGR تبدیل کن
+            cv_image_bgr = cv2.cvtColor(cv_image_yuyv, cv2.COLOR_YUV2BGR_YUYV)
+            
+            # 3. تصویر صحیح را به فرمت JPEG فشرده کن
+            _, buffer = cv2.imencode('.jpg', cv_image_bgr)
+            
+            # 4. تصویر را برای ارسال آماده کن
             jpg_as_text = base64.b64encode(buffer).decode('utf-8')
+            
+            # 5. تصویر صحیح را به رابط کاربری بفرست
             asyncio.run(self.sio.emit('video_update', jpg_as_text))
         except Exception as e:
             self.get_logger().error(f"Error processing image: {e}")
