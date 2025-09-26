@@ -36,11 +36,10 @@ class RosBridgeNode(Node):
     def gps_callback(self, msg):
         asyncio.run(self.sio.emit('gps_update', {'lat': msg.latitude, 'lon': msg.longitude}))
 
+
     def image_callback(self, msg):
         try:
-            # این کد با فرمت ارسالی از v4l2_camera هماهنگ است
-            cv_image_rgb = self.bridge.imgmsg_to_cv2(msg, "rgb8")
-            cv_image_bgr = cv2.cvtColor(cv_image_rgb, cv2.COLOR_RGB2BGR)
+            cv_image_bgr = self.bridge.imgmsg_to_cv2(msg, 'bgr8')
             _, buffer = cv2.imencode('.jpg', cv_image_bgr)
             jpg_as_text = base64.b64encode(buffer).decode('utf-8')
             asyncio.run(self.sio.emit('video_update', jpg_as_text))
