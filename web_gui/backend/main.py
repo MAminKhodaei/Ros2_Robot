@@ -1,21 +1,29 @@
-import socketio, rclpy, threading, asyncio, base64, cv2, os
+# =================================================================
+# ==     main.py - نسخه نهایی با دریافت تصویر فشرده (MJPG)       ==
+# =================================================================
+import socketio, rclpy, threading, asyncio, base64, cv2, os, numpy
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
-from sensor_msgs.msg import NavSatFix, Image
-from cv_bridge import CvBridge
+from sensor_msgs.msg import NavSatFix, CompressedImage  # <-- تغییر مهم: استفاده از CompressedImage
 from sensor_msgs.msg import Range
 
 class RosBridgeNode(Node):
     def __init__(self, sio_server):
         super().__init__('web_gui_ros_bridge')
         self.sio = sio_server
-        self.bridge = CvBridge()
         self.cmd_vel_publisher_ = self.create_publisher(Twist, 'cmd_vel', 10)
         self.gps_subscriber_ = self.create_subscription(NavSatFix, 'gps/fix', self.gps_callback, 10)
         self.distance_subscriber_ = self.create_subscription(Range, 'distance', self.distance_callback, 10)
-        self.image_subscriber_ = self.create_subscription(Image, 'video_stream', self.image_callback, 10)
+        
+        # تغییر مهم: ما به تاپیک تصویر فشرده گوش می‌دهیم
+        self.image_subscriber_ = self.create_subscription(
+            CompressedImage, 
+            'video_stream/compressed', # نام استاندارد تاپیک تصویر فشرده
+            self.image_callback, 
+            10
+        )
         self.get_logger().info('ROS 2 Bridge Node is ready.')
 
     def distance_callback(self, msg):
@@ -34,37 +42,32 @@ class RosBridgeNode(Node):
     def gps_callback(self, msg):
         asyncio.run(self.sio.emit('gps_update', {'lat': msg.latitude, 'lon': msg.longitude}))
 
-    # --- تابع callback جدید برای پردازش هر فریم تصویر ---
+    # --- تابع callback اصلاح شده برای پردازش تصویر فشرده ---
     def image_callback(self, msg):
         try:
-            # 1. تصویر را با فرمت خام YUYV از ROS دریافت کن
-            cv_image_yuyv = self.bridge.imgmsg_to_cv2(msg, "yuyv8")
+            # تبدیل داده‌های فشرده به یک آرایه numpy
+            np_arr = numpy.frombuffer(msg.data, numpy.uint8)
+            # دیکد کردن آرایه numpy به یک تصویر OpenCV
+            cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
             
-            # 2. با استفاده از OpenCV، آن را به فرمت استاندارد BGR تبدیل کن
-            cv_image_bgr = cv2.cvtColor(cv_image_yuyv, cv2.COLOR_YUV2BGR_YUYV)
+            # فشرده‌سازی دوباره (برای اطمینان از فرمت صحیح)
+            _, buffer = cv2.imencode('.jpg', cv_image)
             
-            # 3. تصویر صحیح را به فرمت JPEG فشرده کن
-            _, buffer = cv2.imencode('.jpg', cv_image_bgr)
-            
-            # 4. تصویر را برای ارسال آماده کن
+            # ارسال به رابط کاربری
             jpg_as_text = base64.b64encode(buffer).decode('utf-8')
-            
-            # 5. تصویر صحیح را به رابط کاربری بفرست
             asyncio.run(self.sio.emit('video_update', jpg_as_text))
         except Exception as e:
-            self.get_logger().error(f"Error processing image: {e}")
+            self.get_logger().error(f"Error processing compressed image: {e}")
 
-# --- راه‌اندازی سرور ---
+# --- بقیه کد بدون تغییر باقی می‌ماند ---
 app = FastAPI()
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
 socket_app = socketio.ASGIApp(sio)
 app.mount("/socket.io", socket_app)
 
-# --- مسیردهی مطلق و پایدار به پوشه frontend ---
 backend_dir = os.path.dirname(os.path.abspath(__file__))
 frontend_dir = os.path.join(os.path.dirname(backend_dir), "frontend")
 app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="static")
-# --------------------------------------------------
 
 rclpy.init()
 ros_node = RosBridgeNode(sio_server=sio)
