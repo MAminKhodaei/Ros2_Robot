@@ -1,5 +1,5 @@
 # =================================================================
-# ==        main.py - نسخه نهایی با مسیردهی مطلق و پایدار         ==
+# ==        main.py - نسخه نهایی و صحیح با فرمت رنگ RGB8          ==
 # =================================================================
 import socketio, rclpy, threading, asyncio, base64, cv2, os
 from fastapi import FastAPI
@@ -37,22 +37,22 @@ class RosBridgeNode(Node):
     def gps_callback(self, msg):
         asyncio.run(self.sio.emit('gps_update', {'lat': msg.latitude, 'lon': msg.longitude}))
 
-    # --- تابع callback جدید برای پردازش هر فریم تصویر ---
+    # --- تابع callback اصلاح شده برای پردازش صحیح تصویر ---
     def image_callback(self, msg):
         try:
-            # 1. تصویر را با فرمت خام YUYV از ROS دریافت کن
-            cv_image_yuyv = self.bridge.imgmsg_to_cv2(msg, "yuyv8")
+            # تغییر کلیدی اینجاست: ما به طور مستقیم فرمت rgb8 را می‌خوانیم
+            cv_image = self.bridge.imgmsg_to_cv2(msg, "rgb8")
             
-            # 2. با استفاده از OpenCV، آن را به فرمت استاندارد BGR تبدیل کن
-            cv_image_bgr = cv2.cvtColor(cv_image_yuyv, cv2.COLOR_YUV2BGR_YUYV)
-            
-            # 3. تصویر صحیح را به فرمت JPEG فشرده کن
+            # چون OpenCV به فرمت BGR نیاز دارد، یک بار رنگ‌ها را جابجا می‌کنیم
+            cv_image_bgr = cv2.cvtColor(cv_image, cv2.COLOR_RGB2BGR)
+
+            # تصویر صحیح را به فرمت JPEG فشرده می‌کنیم
             _, buffer = cv2.imencode('.jpg', cv_image_bgr)
             
-            # 4. تصویر را برای ارسال آماده کن
+            # تصویر را برای ارسال آماده می‌کنیم
             jpg_as_text = base64.b64encode(buffer).decode('utf-8')
             
-            # 5. تصویر صحیح را به رابط کاربری بفرست
+            # تصویر صحیح را به رابط کاربری می‌فرستیم
             asyncio.run(self.sio.emit('video_update', jpg_as_text))
         except Exception as e:
             self.get_logger().error(f"Error processing image: {e}")
@@ -64,7 +64,6 @@ socket_app = socketio.ASGIApp(sio)
 app.mount("/socket.io", socket_app)
 
 # --- مسیردهی مطلق و پایدار به پوشه frontend ---
-# این کد مسیر فایل فعلی (main.py) را گرفته و مسیر پوشه frontend را محاسبه می‌کند
 backend_dir = os.path.dirname(os.path.abspath(__file__))
 frontend_dir = os.path.join(os.path.dirname(backend_dir), "frontend")
 app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="static")
