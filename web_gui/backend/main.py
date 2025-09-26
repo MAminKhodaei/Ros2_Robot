@@ -39,7 +39,8 @@ class RosBridgeNode(Node):
 
     def image_callback(self, msg):
         try:
-            cv_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
+            # کد صحیح و پایدار
+            cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
             _, buffer = cv2.imencode('.jpg', cv_image)
             jpg_as_text = base64.b64encode(buffer).decode('utf-8')
             asyncio.run(self.sio.emit('video_update', jpg_as_text))
