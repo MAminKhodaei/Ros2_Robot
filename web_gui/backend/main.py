@@ -1,7 +1,7 @@
 # =================================================================
 # ==        main.py - نسخه نهایی با قابلیت WebRTC                 ==
 # =================================================================
-import socketio, rclpy, threading, asyncio, base64, cv2, os, numpy
+import socketio, rclpy, threading, asyncio, base64, cv2, os, numpy, uuid
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from rclpy.node import Node
@@ -9,9 +9,9 @@ from geometry_msgs.msg import Twist
 from sensor_msgs.msg import NavSatFix, Image, Range
 from cv_bridge import CvBridge
 from aiortc import RTCPeerConnection, RTCSessionDescription
-from aiortc.contrib.media import MediaRelay
+from aiortc.contrib.media import MediaStreamTrack
 
-# --- کلاس گره اصلی ROS (بدون تغییر) ---
+# --- کلاس گره اصلی ROS ---
 class RosBridgeNode(Node):
     def __init__(self, sio_server):
         super().__init__('web_gui_ros_bridge')
@@ -84,29 +84,31 @@ ros_thread.start()
 
 # --- منطق جدید WebRTC ---
 pcs = set()
-relay = MediaRelay()
+
+class VideoTransformTrack(MediaStreamTrack):
+    kind = "video"
+    def __init__(self, track):
+        super().__init__()
+        self.track = track
+
+    async def recv(self):
+        frame = await self.track.recv()
+        img = frame.to_ndarray(format="bgr24")
+        external_camera_node.publish_frame(img)
+        return frame
 
 @app.post("/offer")
 async def offer(request: dict):
     offer = RTCSessionDescription(sdp=request["sdp"], type=request["type"])
     pc = RTCPeerConnection()
+    pc_id = f"PeerConnection({uuid.uuid4()})"
     pcs.add(pc)
-
+    
     @pc.on("track")
-    async def on_track(track):
-        relayed_track = relay.subscribe(track)
-        
-        async def frame_processor():
-            while True:
-                try:
-                    frame = await relayed_track.recv()
-                    img = frame.to_ndarray(format="bgr24")
-                    external_camera_node.publish_frame(img)
-                except Exception:
-                    break
-        
-        asyncio.ensure_future(frame_processor())
-
+    def on_track(track):
+        if track.kind == "video":
+            pc.addTrack(VideoTransformTrack(track))
+            
     await pc.setRemoteDescription(offer)
     answer = await pc.createAnswer()
     await pc.setLocalDescription(answer)
