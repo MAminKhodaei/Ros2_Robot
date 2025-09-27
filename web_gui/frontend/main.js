@@ -1,74 +1,86 @@
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("رابط کاربری بارگذاری شد.");
-    
-    // --- گرفتن دسترسی به تمام المان‌های نمایشی ---
+    // --- گرفتن دسترسی به المان‌های HTML ---
+    const videoStreamEl = document.getElementById('video-stream');
     const connectionStatusEl = document.getElementById('connection-status');
     const gpsStatusEl = document.getElementById('gps-status');
     const distanceStatusEl = document.getElementById('distance-status');
-    const videoStreamEl = document.getElementById('video-stream'); // <-- جدید
+    const localCameraBtn = document.getElementById('btn-local-camera');
+    const localVideoPreview = document.getElementById('local-video-preview');
+    const localVideoPanel = document.getElementById('local-video-panel');
 
     // --- راه‌اندازی نقشه ---
     const map = L.map('map').setView([35.6892, 51.3890], 5);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '© OpenStreetMap'
-    }).addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
     let robotMarker = L.marker([35.6892, 51.3890]).addTo(map).bindPopup('موقعیت ربات');
     let isFirstGpsUpdate = true;
 
-    // Listen for distance updates from the server
-    // --- اتصال WebSocket و مدیریت رویدادها ---
+    // --- اتصال WebSocket ---
     const socket = io();
-
-    socket.on('connect', () => {
-        connectionStatusEl.textContent = 'متصل';
-        connectionStatusEl.style.color = '#66ff66';
-    });
-
-    socket.on('disconnect', () => {
-        connectionStatusEl.textContent = 'قطع';
-        connectionStatusEl.style.color = '#ff6666';
-    });
-
-    socket.on('gps_update', (data) => {
-        const { lat, lon } = data;
-        const newLatLng = [lat, lon];
-        robotMarker.setLatLng(newLatLng);
-        gpsStatusEl.textContent = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
-        if (isFirstGpsUpdate) {
-            map.setView(newLatLng, 16);
-            isFirstGpsUpdate = false;
-        }
-    });
-
-    socket.on('distance_update', (data) => {
-        distanceStatusEl.textContent = data.distance;
-    });
-
-    // --- رویداد جدید برای به‌روزرسانی ویدیو ---
-    socket.on('video_update', (image_data) => {
-        // به‌روز کردن منبع تگ تصویر با داده‌های جدید
-        videoStreamEl.src = `data:image/jpeg;base64,${image_data}`;
-    });
-    // ----------------------------------------
-
-    // --- منطق دکمه‌های کنترل (بدون تغییر) ---
-    const buttons_control = {
-        'btn-forward': 'forward', 'btn-backward': 'backward',
-        'btn-left': 'left', 'btn-right': 'right',
-    };
+    socket.on('connect', () => { connectionStatusEl.textContent = 'متصل'; connectionStatusEl.style.color = '#66ff66'; });
+    socket.on('disconnect', () => { connectionStatusEl.textContent = 'قطع'; connectionStatusEl.style.color = '#ff6666'; });
     
-    function sendCommand_control(command) {
-        socket.emit('control', { command: command });
-    }
+    // --- مدیریت رویدادهای WebSocket ---
+    socket.on('gps_update', (data) => {
+        const newLatLng = [data.lat, data.lon];
+        robotMarker.setLatLng(newLatLng);
+        gpsStatusEl.textContent = `${data.lat.toFixed(5)}, ${data.lon.toFixed(5)}`;
+        if (isFirstGpsUpdate) { map.setView(newLatLng, 16); isFirstGpsUpdate = false; }
+    });
+    socket.on('distance_update', (data) => { distanceStatusEl.textContent = data.distance; });
+    socket.on('video_update', (image_data) => { videoStreamEl.src = `data:image/jpeg;base64,${image_data}`; });
 
+    // --- منطق دکمه‌های کنترل حرکت ---
+    const buttons_control = { 'btn-forward': 'forward', 'btn-backward': 'backward', 'btn-left': 'left', 'btn-right': 'right' };
+    function sendCommand(command) { socket.emit('control', { command: command }); }
     for (const [id, command] of Object.entries(buttons_control)) {
         const button = document.getElementById(id);
         if (button) {
-            button.addEventListener('mousedown', () => sendCommand_control(command));
-            button.addEventListener('mouseup', () => sendCommand_control('stop'));
-            button.addEventListener('mouseleave', () => sendCommand_control('stop'));
+            button.addEventListener('mousedown', () => sendCommand(command));
+            button.addEventListener('mouseup', () => sendCommand('stop'));
+            button.addEventListener('mouseleave', () => sendCommand('stop'));
         }
     }
-    document.getElementById('btn-stop').addEventListener('click', () => sendCommand_control('stop'));
+    document.getElementById('btn-stop').addEventListener('click', () => sendCommand('stop'));
+
+    // --- منطق جدید: WebRTC برای دوربین محلی ---
+    let pc = null; // Peer Connection
+    localCameraBtn.addEventListener('click', async () => {
+        if (pc) {
+            pc.close();
+            pc = null;
+            localVideoPreview.srcObject.getTracks().forEach(track => track.stop());
+            localVideoPanel.style.display = 'none';
+            localCameraBtn.textContent = 'فعال‌سازی دوربین محلی';
+            localCameraBtn.style.backgroundColor = '#007bff';
+            return;
+        }
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            localVideoPreview.srcObject = stream;
+            localVideoPanel.style.display = 'block';
+            localCameraBtn.textContent = 'قطع دوربین محلی';
+            localCameraBtn.style.backgroundColor = '#dc3545';
+
+            pc = new RTCPeerConnection();
+            stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+            pc.oniceconnectionstatechange = () => console.log(`ICE Connection State: ${pc.iceConnectionState}`);
+
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+
+            const response = await fetch('/offer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sdp: pc.localDescription.sdp, type: pc.localDescription.type })
+            });
+
+            const answer = await response.json();
+            await pc.setRemoteDescription(new RTCSessionDescription(answer));
+
+        } catch (e) {
+            alert(`خطا در دسترسی به دوربین: ${e.toString()}`);
+        }
+    });
 });

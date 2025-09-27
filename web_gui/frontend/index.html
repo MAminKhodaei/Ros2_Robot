@@ -10,8 +10,8 @@
     <div class="main-container">
         <div class="media-column">
             <div id="video-container" class="panel">
-                <div class="panel-header">دوربین زنده</div>
-                <img id="video-stream" src="placeholder.jpg" alt="جایگاه تصویر دوربین">
+                <div class="panel-header">دوربین ربات</div>
+                <img id="video-stream" src="placeholder.jpg" alt="جایگاه تصویر دوربین ربات">
             </div>
             <div id="map-container" class="panel">
                 <div class="panel-header">موقعیت GPS</div>
@@ -24,20 +24,28 @@
                 <div class="panel-header">کنترل حرکت</div>
                 <div class="d-pad">
                     <button id="btn-forward">▲</button>
-                    <button id="btn-left">▶</button>
+                    <button id="btn-left">◀</button>
                     <button id="btn-stop">■</button>
-                    <button id="btn-right">◀</button>
+                    <button id="btn-right">▶</button>
                     <button id="btn-backward">▼</button>
                 </div>
+                <hr class="separator">
+                <div class="panel-header">دوربین اپراتور</div>
+                <button id="btn-local-camera">فعال‌سازی دوربین محلی</button>
             </div>
             <div id="status-container" class="panel">
                 <div class="panel-header">وضعیت سیستم</div>
-                <p>وضعیت اتصال: <span id="connection-status">قطع</span></p>
+                <p>اتصال سرور: <span id="connection-status">قطع</span></p>
                 <p>GPS: <span id="gps-status">در حال جستجو...</span></p>
-                <p>فاصله از مانع: <span id="distance-status">N/A</span> cm</p>
+                <p>فاصله: <span id="distance-status">N/A</span> cm</p>
+            </div>
+            <div id="local-video-panel" class="panel" style="display: none;">
+                <div class="panel-header">پیش‌نمایش دوربین شما</div>
+                <video id="local-video-preview" autoplay playsinline muted></video>
             </div>
         </div>
     </div>
+    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
