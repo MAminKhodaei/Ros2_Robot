@@ -1,9 +1,8 @@
-# serial_bridge_node.py - نسخه نهایی با پشتیبانی از GPS و سنسور فاصله
 
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
-from sensor_msgs.msg import NavSatFix, Range  # <-- Range را اینجا اضافه کنید
+from sensor_msgs.msg import NavSatFix, Range 
 import serial
 import threading
 import time
@@ -26,12 +25,9 @@ class SerialBridgeNode(Node):
             rclpy.shutdown()
             return
 
-        # --- تعریف تمام Subscribers و Publishers ---
         self.cmd_vel_sub = self.create_subscription(Twist, 'cmd_vel', self.cmd_vel_callback, 10)
         self.gps_pub = self.create_publisher(NavSatFix, 'gps/fix', 10)
-        # --- Publisher جدید برای سنسور فاصله ---
         self.distance_pub = self.create_publisher(Range, 'distance', 10)
-        # ----------------------------------------
         
         self.read_thread = threading.Thread(target=self.serial_read_loop, daemon=True)
         self.read_thread.start()
